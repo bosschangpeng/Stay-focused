@@ -12,7 +12,7 @@ for folder in ["sounds", "icons"]:
         os.makedirs(folder)
         print(f"Created {folder} folder")
 
-# 检查声音文件是否存在，不存在则报错
+# Check if sound files exist, error if missing
 sound_files = [
     ("sounds/ding.mp3", "Missing notification sound file"),
     ("sounds/break.mp3", "Missing break notification sound file"),
@@ -24,28 +24,28 @@ for sound_file, error_msg in sound_files:
         print(f"ERROR: {error_msg} {sound_file}")
         missing_files = True
 
-# 检查图标文件是否存在
+# Check if icon files exist
 icon_file_ico = "icons/clock.ico"
 icon_file_png = "icons/clock.png"
 
-# 优先使用 .ico 文件作为应用图标
+# Use .ico file as priority for application icon
 if os.path.exists(icon_file_ico):
     print(f"Using icon file: {icon_file_ico}")
     icon_file = icon_file_ico
 elif os.path.exists(icon_file_png):
     print(f"Using icon file: {icon_file_png} (PNG format)")
-    # PyInstaller 在 Windows 上打包时最好使用 .ico 格式
-    # 但如果没有 .ico 文件，也可以尝试使用 .png
+    # PyInstaller works better with .ico format on Windows
+    # but can also try with .png if no .ico available
     icon_file = icon_file_png
 else:
     print(f"ERROR: Missing icon file. Need either {icon_file_ico} or {icon_file_png}")
     missing_files = True
 
 if missing_files:
-    print("\n资源文件缺失！请确保以下文件存在：")
+    print("\nMissing resource files! Please ensure the following files exist:")
     print("- sounds/ding.mp3")
     print("- sounds/break.mp3")
-    print("- icons/clock.png 或 icons/clock.ico")
+    print("- icons/clock.png or icons/clock.ico")
     sys.exit(1)
 
 # Use Windows optimized version of the script
@@ -57,13 +57,13 @@ if not os.path.exists(main_script):
 # Determine the correct separator for --add-data based on the platform
 separator = ';' if sys.platform.startswith('win') else ':'
 
-# 打印当前目录结构，便于调试
-print("\n当前工作目录结构:")
-print(f"工作目录: {os.getcwd()}")
-print("sounds/ 目录内容:")
+# Print current directory structure for debugging
+print("\nCurrent working directory structure:")
+print(f"Working directory: {os.getcwd()}")
+print("sounds/ directory contents:")
 if os.path.exists("sounds"):
     print(os.listdir("sounds"))
-print("icons/ 目录内容:")
+print("icons/ directory contents:")
 if os.path.exists("icons"):
     print(os.listdir("icons"))
 
@@ -78,7 +78,7 @@ args = [
     f'--add-data=icons/clock.png{separator}icons',
 ]
 
-# 如果有 .ico 文件，添加图标参数
+# Add icon parameter if .ico file exists
 if os.path.exists(icon_file_ico):
     args.append(f'--icon={icon_file_ico}')
 elif os.path.exists(icon_file_png):
