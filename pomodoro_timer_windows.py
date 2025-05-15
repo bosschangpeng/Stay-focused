@@ -117,31 +117,49 @@ class PomodoroTimer(QMainWindow):
         settings_layout.addRow("工作间隔:", interval_widget)
         
         # 短休息设置
+        short_break_widget = QWidget()
+        short_break_layout = QHBoxLayout(short_break_widget)
+        short_break_layout.setContentsMargins(0, 0, 0, 0)
+        
         self.short_break_spinbox = QSpinBox()
         self.short_break_spinbox.setRange(5, 60)
         self.short_break_spinbox.setValue(self.short_break)
         self.short_break_spinbox.setSingleStep(5)
         self.short_break_spinbox.setMinimumWidth(70)
-        settings_layout.addRow("短休息时间:", self.short_break_spinbox)
-        settings_layout.addWidget(QLabel("秒"), 1, 2)
+        short_break_layout.addWidget(self.short_break_spinbox)
+        short_break_layout.addWidget(QLabel("秒"))
+        short_break_layout.addStretch(1)
+        settings_layout.addRow("短休息时间:", short_break_widget)
         
         # 长休息设置
+        long_break_widget = QWidget()
+        long_break_layout = QHBoxLayout(long_break_widget)
+        long_break_layout.setContentsMargins(0, 0, 0, 0)
+        
         self.long_break_spinbox = QSpinBox()
         self.long_break_spinbox.setRange(5, 60)
         self.long_break_spinbox.setValue(self.long_break)
         self.long_break_spinbox.setSingleStep(5)
         self.long_break_spinbox.setMinimumWidth(70)
-        settings_layout.addRow("长休息时间:", self.long_break_spinbox)
-        settings_layout.addWidget(QLabel("分钟"), 2, 2)
+        long_break_layout.addWidget(self.long_break_spinbox)
+        long_break_layout.addWidget(QLabel("分钟"))
+        long_break_layout.addStretch(1)
+        settings_layout.addRow("长休息时间:", long_break_widget)
         
         # 总时间设置
+        total_time_widget = QWidget()
+        total_time_layout = QHBoxLayout(total_time_widget)
+        total_time_layout.setContentsMargins(0, 0, 0, 0)
+        
         self.total_time_spinbox = QSpinBox()
         self.total_time_spinbox.setRange(10, 240)
         self.total_time_spinbox.setValue(self.total_time)
         self.total_time_spinbox.setSingleStep(10)
         self.total_time_spinbox.setMinimumWidth(70)
-        settings_layout.addRow("总工作时间:", self.total_time_spinbox)
-        settings_layout.addWidget(QLabel("分钟"), 3, 2)
+        total_time_layout.addWidget(self.total_time_spinbox)
+        total_time_layout.addWidget(QLabel("分钟"))
+        total_time_layout.addStretch(1)
+        settings_layout.addRow("总工作时间:", total_time_widget)
         
         main_layout.addWidget(settings_group)
         
@@ -190,19 +208,29 @@ class PomodoroTimer(QMainWindow):
     def init_tray(self):
         # 创建系统托盘图标
         self.tray_icon = QSystemTrayIcon(self)
+        
+        # 尝试设置图标
         try:
             icon_path = resource_path("icons/clock.png")
             if os.path.exists(icon_path):
                 self.tray_icon.setIcon(QIcon(icon_path))
-        except:
-            # 使用默认图标
-            pass
+            else:
+                # 如果找不到自定义图标，使用默认应用图标
+                self.tray_icon.setIcon(QIcon(os.path.join(os.path.dirname(sys.executable), "pythonw.exe")))
+        except Exception as e:
+            print(f"设置托盘图标失败: {e}")
+            # 尝试使用Windows系统提供的默认图标
+            try:
+                from PyQt5.QtWinExtras import QtWinTheme
+                self.tray_icon.setIcon(QtWinTheme.createIconFromHICON(0))
+            except:
+                pass
         
         # 创建托盘菜单
         tray_menu = QMenu()
         
-        show_action = QAction("显示", self)
-        show_action.triggered.connect(self.show)
+        show_action = QAction("打开", self)
+        show_action.triggered.connect(self.show_window)
         tray_menu.addAction(show_action)
         
         quit_action = QAction("退出", self)
@@ -210,17 +238,26 @@ class PomodoroTimer(QMainWindow):
         tray_menu.addAction(quit_action)
         
         self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.activated.connect(self.tray_icon_activated)
+        
+        # 显示托盘图标
         self.tray_icon.show()
         
-        # 托盘图标点击事件
-        self.tray_icon.activated.connect(self.tray_icon_activated)
+        # 设置工具提示
+        self.tray_icon.setToolTip("专注时钟")
+    
+    def show_window(self):
+        self.show()
+        self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
+        self.activateWindow()
+        self.raise_()
     
     def tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.DoubleClick:
-            self.show()
-            self.activateWindow()
+            self.show_window()
     
     def closeEvent(self, event):
+        # 直接最小化到托盘，不弹出询问对话框
         event.ignore()
         self.hide()
         self.tray_icon.showMessage(
@@ -231,7 +268,9 @@ class PomodoroTimer(QMainWindow):
         )
     
     def close_application(self):
+        # 完全退出应用
         self.stop_timer()
+        self.tray_icon.hide()  # 隐藏托盘图标
         QApplication.quit()
     
     def start_timer(self):
