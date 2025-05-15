@@ -1,15 +1,102 @@
 import sys
 import random
 import time
+import math
 from datetime import datetime, timedelta
 import threading
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLabel, QPushButton, QSpinBox, 
                             QSystemTrayIcon, QMenu, QAction, QMessageBox,
                             QGridLayout, QSizePolicy, QGroupBox, QFormLayout)
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot, QEvent, QSize
-from PyQt5.QtGui import QIcon, QFont
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot, QEvent, QSize, QRectF
+from PyQt5.QtGui import QIcon, QFont, QPainter, QPen, QColor, QBrush
 import pygame
+import os
+
+class CircularProgressBar(QWidget):
+    """自定义圆形进度条控件"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumSize(220, 220)  # 设置最小尺寸以确保有足够空间绘制
+        self.percentage = 0
+        self.text = "00:00"
+        self.total_text = "总剩余: 00:00:00"
+
+    def setPercentage(self, value):
+        """设置进度百分比 (0-100)"""
+        self.percentage = value
+        self.update()  # 触发重绘
+
+    def setText(self, text):
+        """设置中心显示的文本"""
+        self.text = text
+        self.update()
+
+    def setTotalText(self, text):
+        """设置总剩余时间文本"""
+        self.total_text = text
+        self.update()
+
+    def paintEvent(self, event):
+        """绘制圆形进度条"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)  # 启用抗锯齿
+        
+        # 计算绘制区域
+        width = self.width()
+        height = self.height()
+        size = min(width, height) - 10  # 留出一些边距
+        rect = QRectF((width - size) / 2, (height - size) / 2, size, size)
+        
+        # 绘制背景圆圈
+        painter.setPen(QPen(QColor(200, 200, 200), 10))
+        painter.drawEllipse(rect)
+        
+        # 绘制进度弧
+        if self.percentage > 0:
+            painter.setPen(QPen(QColor(76, 175, 80), 10))  # 设置为绿色，可以根据需要调整
+            # 计算起始角度和跨度角度，Qt中0度是3点钟方向，逆时针旋转
+            start_angle = 90 * 16  # 从12点钟方向开始
+            span_angle = -self.percentage * 360 * 16 / 100  # 乘以16是因为Qt使用1/16度单位
+            painter.drawArc(rect, start_angle, span_angle)
+        
+        # 绘制刻度线
+        painter.save()
+        painter.setPen(QPen(QColor(100, 100, 100), 1))
+        painter.translate(width / 2, height / 2)  # 将原点移到中心
+        radius = size / 2 - 5  # 略微调整刻度线位置
+        
+        # 绘制60个细小刻度
+        for i in range(60):
+            if i % 5 == 0:  # 每5分钟一个大刻度
+                painter.setPen(QPen(QColor(50, 50, 50), 2))
+                outer = radius
+                inner = radius - 10
+            else:
+                painter.setPen(QPen(QColor(150, 150, 150), 1))
+                outer = radius
+                inner = radius - 5
+            
+            angle = i * 6  # 每个刻度6度
+            x1 = inner * math.sin(math.radians(angle))
+            y1 = -inner * math.cos(math.radians(angle))
+            x2 = outer * math.sin(math.radians(angle))
+            y2 = -outer * math.cos(math.radians(angle))
+            painter.drawLine(x1, y1, x2, y2)
+        
+        painter.restore()
+        
+        # 绘制当前时间文本
+        painter.setPen(QColor(10, 10, 10))
+        font = QFont("Arial", 28, QFont.Bold)
+        painter.setFont(font)
+        painter.drawText(rect, Qt.AlignCenter, self.text)
+        
+        # 绘制总剩余时间文本
+        font = QFont("Arial", 12)
+        painter.setFont(font)
+        total_rect = QRectF(rect.left(), rect.bottom() - 30, rect.width(), 30)
+        painter.drawText(total_rect, Qt.AlignCenter, self.total_text)
 
 class PomodoroTimer(QMainWindow):
     update_signal = pyqtSignal(str)
@@ -55,6 +142,12 @@ class PomodoroTimer(QMainWindow):
     def init_ui(self):
         self.setWindowTitle("专注时钟")
         self.setMinimumSize(500, 400)  # 设置最小尺寸，允许放大
+        
+        # 设置窗口图标
+        try:
+            self.setWindowIcon(QIcon('icons/clock.png'))
+        except:
+            pass
         
         # 主布局
         central_widget = QWidget()
@@ -160,17 +253,21 @@ class PomodoroTimer(QMainWindow):
         self.status_label.setFont(QFont("Arial", 14))
         status_layout.addWidget(self.status_label)
         
-        # 倒计时显示
-        self.timer_label = QLabel("00:00")
-        self.timer_label.setAlignment(Qt.AlignCenter)
-        self.timer_label.setFont(QFont("Arial", 36, QFont.Bold))
-        status_layout.addWidget(self.timer_label)
+        # 使用圆形进度条替代原来的倒计时标签
+        self.progress_widget = CircularProgressBar()
+        status_layout.addWidget(self.progress_widget, 1)  # 给进度条更多空间
         
-        # 总剩余时间显示
+        # 隐藏原来的倒计时标签，但保留用于内部逻辑
+        self.timer_label = QLabel("00:00")
+        self.timer_label.hide()
+        
+        # 隐藏原来的总剩余时间标签，但保留用于内部逻辑
         self.total_time_remaining_label = QLabel(f"总剩余: {self.format_total_seconds(self.total_time * 60)}")
-        self.total_time_remaining_label.setAlignment(Qt.AlignCenter)
-        self.total_time_remaining_label.setFont(QFont("Arial", 12)) # 稍小字体
-        status_layout.addWidget(self.total_time_remaining_label)
+        self.total_time_remaining_label.hide()
+        
+        # 设置进度条的初始文本
+        self.progress_widget.setText("00:00")
+        self.progress_widget.setTotalText(f"总剩余: {self.format_total_seconds(self.total_time * 60)}")
         
         main_layout.addWidget(status_group)
         
@@ -287,6 +384,7 @@ class PomodoroTimer(QMainWindow):
         self.total_target_seconds = self.total_time * 60
         self.overall_start_time = time.time()
         self.total_time_remaining_label.setText(f"总剩余: {self.format_total_seconds(self.total_target_seconds)}")
+        self.progress_widget.setTotalText(f"总剩余: {self.format_total_seconds(self.total_target_seconds)}")
         
         # 启动计时器线程
         self.timer_thread = threading.Thread(target=self.timer_loop)
@@ -314,10 +412,14 @@ class PomodoroTimer(QMainWindow):
             # 更新状态
             self.update_signal.emit("已停止")
             self.timer_label.setText("00:00")
+            self.progress_widget.setText("00:00")
+            self.progress_widget.setPercentage(0)
             
             # 重置总时间显示以反映当前spinbox中的设置
             current_total_seconds_setting = self.total_time_spinbox.value() * 60
-            self.total_time_remaining_label.setText(f"总剩余: {self.format_total_seconds(current_total_seconds_setting)}")
+            total_remaining_text = f"总剩余: {self.format_total_seconds(current_total_seconds_setting)}"
+            self.total_time_remaining_label.setText(total_remaining_text)
+            self.progress_widget.setTotalText(total_remaining_text)
             
             # 重置总计时器内部状态
             self.overall_start_time = 0
@@ -371,6 +473,7 @@ class PomodoroTimer(QMainWindow):
         # 更新计时器显示
         mins, secs = divmod(self.remaining_time, 60)
         self.timer_label.setText(f"{mins:02d}:{secs:02d}")
+        self.progress_widget.setText(f"{mins:02d}:{secs:02d}")
 
         # 更新总剩余时间显示
         if self.is_running and self.overall_start_time > 0:
@@ -380,12 +483,14 @@ class PomodoroTimer(QMainWindow):
             if remaining_overall_seconds < 0:
                 remaining_overall_seconds = 0
             
-            self.total_time_remaining_label.setText(f"总剩余: {self.format_total_seconds(remaining_overall_seconds)}")
+            total_remaining_text = f"总剩余: {self.format_total_seconds(remaining_overall_seconds)}"
+            self.total_time_remaining_label.setText(total_remaining_text)
+            self.progress_widget.setTotalText(total_remaining_text)
         elif not self.is_running:
-            # 如果计时器停止，stop_timer会处理总时间标签的最终状态
-            # 如果是通过spinbox更改总时间，则标签已在stop_timer中更新
-            # 或在init_ui中初始化
-            pass
+            # 如果计时器停止，显示当前设置的总时间
+            current_total_seconds_setting = self.total_time_spinbox.value() * 60
+            total_remaining_text = f"总剩余: {self.format_total_seconds(current_total_seconds_setting)}"
+            self.progress_widget.setTotalText(total_remaining_text)
     
     def countdown(self, seconds, mode):
         self.remaining_time = seconds
@@ -409,11 +514,63 @@ class PomodoroTimer(QMainWindow):
         
         # 更新计时器显示
         mins, secs = divmod(self.remaining_time, 60)
-        self.timer_label.setText(f"{mins:02d}:{secs:02d}")
+        time_str = f"{mins:02d}:{secs:02d}"
+        self.timer_label.setText(time_str)
+        self.progress_widget.setText(time_str)
+        
+        # 计算并更新进度百分比
+        if self.is_running:
+            if "工作中" in msg:
+                # 工作时间进度
+                total_secs = self.current_interval
+                elapsed = total_secs - self.remaining_time
+                percentage = elapsed / total_secs * 100 if total_secs > 0 else 0
+            elif "短休息" in msg:
+                # 短休息进度
+                total_secs = self.short_break
+                elapsed = total_secs - self.remaining_time
+                percentage = elapsed / total_secs * 100 if total_secs > 0 else 0
+            elif "长休息" in msg:
+                # 长休息进度
+                total_secs = self.long_break * 60
+                elapsed = total_secs - self.remaining_time
+                percentage = elapsed / total_secs * 100 if total_secs > 0 else 0
+            else:
+                percentage = 0
+                
+            self.progress_widget.setPercentage(percentage)
+        else:
+            self.progress_widget.setPercentage(0)
+        
+        # 更新总剩余时间显示
+        if self.is_running and self.overall_start_time > 0:
+            elapsed_overall_seconds = time.time() - self.overall_start_time
+            remaining_overall_seconds = self.total_target_seconds - elapsed_overall_seconds
+            
+            if remaining_overall_seconds < 0:
+                remaining_overall_seconds = 0
+            
+            total_remaining_text = f"总剩余: {self.format_total_seconds(remaining_overall_seconds)}"
+            self.total_time_remaining_label.setText(total_remaining_text)
+            self.progress_widget.setTotalText(total_remaining_text)
+        elif not self.is_running:
+            # 如果计时器停止，显示当前设置的总时间
+            current_total_seconds_setting = self.total_time_spinbox.value() * 60
+            total_remaining_text = f"总剩余: {self.format_total_seconds(current_total_seconds_setting)}"
+            self.progress_widget.setTotalText(total_remaining_text)
 
 def main():
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)  # 关闭窗口时不退出应用
+    
+    # 设置应用程序图标，以便在任务栏和桌面快捷方式中显示
+    try:
+        icon_path = "icons/clock.png"
+        if os.path.exists(icon_path):
+            app_icon = QIcon(icon_path)
+            app.setWindowIcon(app_icon)
+    except Exception as e:
+        print(f"设置应用程序图标失败: {e}")
     
     timer = PomodoroTimer()
     timer.show()

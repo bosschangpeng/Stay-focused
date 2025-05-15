@@ -27,11 +27,3 @@
 
 您可以替换这些文件以自定义提示音。
 
-## 打包指南
-
-要将此项目打包为exe文件，请按照以下步骤操作：
-
-1. 确保已安装所有依赖：`pip install -r requirements.txt`
-2. 运行打包命令：`pyinstaller --onefile --windowed --icon=icons/clock.ico --name="专注时钟" pomodoro_timer_windows.py`
-3. 或者直接运行：`python build.py`
-4. 打包好的文件将位于 `dist` 目录中 
