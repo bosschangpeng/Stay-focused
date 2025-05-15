@@ -41,16 +41,26 @@ if not os.path.exists(main_script):
     print(f"Error: Main script file {main_script} not found")
     sys.exit(1)
 
-# Run PyInstaller packaging
-print("Starting PyInstaller packaging process...")
-PyInstaller.__main__.run([
+# Determine the correct separator for --add-data based on the platform
+separator = ';' if sys.platform.startswith('win') else ':'
+
+# Build command arguments list
+args = [
     main_script,
     '--name=FocusTimer',
     '--onefile',
     '--windowed',
-    '--add-data=sounds;sounds',
-    '--add-data=icons;icons',
-    f'--icon={icon_file}' if os.path.exists(icon_file) else '',
-])
+    f'--add-data=sounds{separator}sounds',
+    f'--add-data=icons{separator}icons',
+]
+
+# Only add icon if it exists
+if os.path.exists(icon_file):
+    args.append(f'--icon={icon_file}')
+
+# Run PyInstaller packaging
+print("Starting PyInstaller packaging process...")
+print(f"Command arguments: {args}")
+PyInstaller.__main__.run(args)
 
 print("Packaging complete! Executable file is located at dist/FocusTimer.exe") 
