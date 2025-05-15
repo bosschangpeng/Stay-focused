@@ -38,8 +38,19 @@ class PomodoroTimer(QMainWindow):
         self.total_elapsed = 0
         self.current_interval = 0
         
+        # 总时间倒计时相关
+        self.overall_start_time = 0
+        self.total_target_seconds = 0
+        self.total_time_remaining_label = None # 将在 init_ui 中创建
+        
         self.init_ui()
         self.init_tray()
+    
+    def format_total_seconds(self, total_seconds):
+        s = int(total_seconds)
+        m, s_rem = divmod(s, 60)
+        h, m_rem = divmod(m, 60)
+        return f"{h:02d}:{m_rem:02d}:{s_rem:02d}"
     
     def init_ui(self):
         self.setWindowTitle("专注时钟")
@@ -155,6 +166,12 @@ class PomodoroTimer(QMainWindow):
         self.timer_label.setFont(QFont("Arial", 36, QFont.Bold))
         status_layout.addWidget(self.timer_label)
         
+        # 总剩余时间显示
+        self.total_time_remaining_label = QLabel(f"总剩余: {self.format_total_seconds(self.total_time * 60)}")
+        self.total_time_remaining_label.setAlignment(Qt.AlignCenter)
+        self.total_time_remaining_label.setFont(QFont("Arial", 12)) # 稍小字体
+        status_layout.addWidget(self.total_time_remaining_label)
+        
         main_layout.addWidget(status_group)
         
         # 控制按钮
@@ -266,6 +283,11 @@ class PomodoroTimer(QMainWindow):
         self.is_running = True
         self.total_elapsed = 0
         
+        # 设置总时间倒计时
+        self.total_target_seconds = self.total_time * 60
+        self.overall_start_time = time.time()
+        self.total_time_remaining_label.setText(f"总剩余: {self.format_total_seconds(self.total_target_seconds)}")
+        
         # 启动计时器线程
         self.timer_thread = threading.Thread(target=self.timer_loop)
         self.timer_thread.daemon = True
@@ -292,6 +314,14 @@ class PomodoroTimer(QMainWindow):
             # 更新状态
             self.update_signal.emit("已停止")
             self.timer_label.setText("00:00")
+            
+            # 重置总时间显示以反映当前spinbox中的设置
+            current_total_seconds_setting = self.total_time_spinbox.value() * 60
+            self.total_time_remaining_label.setText(f"总剩余: {self.format_total_seconds(current_total_seconds_setting)}")
+            
+            # 重置总计时器内部状态
+            self.overall_start_time = 0
+            self.total_target_seconds = 0
     
     def timer_loop(self):
         while self.is_running and self.total_elapsed < self.total_time * 60:
@@ -337,6 +367,25 @@ class PomodoroTimer(QMainWindow):
             
             # 重置计时器
             self.stop_timer()
+        
+        # 更新计时器显示
+        mins, secs = divmod(self.remaining_time, 60)
+        self.timer_label.setText(f"{mins:02d}:{secs:02d}")
+
+        # 更新总剩余时间显示
+        if self.is_running and self.overall_start_time > 0:
+            elapsed_overall_seconds = time.time() - self.overall_start_time
+            remaining_overall_seconds = self.total_target_seconds - elapsed_overall_seconds
+            
+            if remaining_overall_seconds < 0:
+                remaining_overall_seconds = 0
+            
+            self.total_time_remaining_label.setText(f"总剩余: {self.format_total_seconds(remaining_overall_seconds)}")
+        elif not self.is_running:
+            # 如果计时器停止，stop_timer会处理总时间标签的最终状态
+            # 如果是通过spinbox更改总时间，则标签已在stop_timer中更新
+            # 或在init_ui中初始化
+            pass
     
     def countdown(self, seconds, mode):
         self.remaining_time = seconds
