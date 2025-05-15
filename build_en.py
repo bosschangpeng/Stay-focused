@@ -1,10 +1,20 @@
 import os
 import sys
 import shutil
+import subprocess
 from distutils.core import setup
 import PyInstaller.__main__
 
 print("Starting to package Focus Timer application...")
+
+# Install Pillow for icon processing
+try:
+    print("Installing Pillow library for icon processing...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "Pillow"])
+    print("Pillow installed successfully")
+except Exception as e:
+    print(f"Warning: Failed to install Pillow: {e}")
+    print("Icon conversion may not work properly")
 
 # Ensure necessary folders exist
 for folder in ["sounds", "icons"]:
