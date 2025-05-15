@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                             QSystemTrayIcon, QMenu, QAction, QMessageBox,
                             QGridLayout, QSizePolicy, QGroupBox, QFormLayout)
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot, QEvent, QSize
-from PyQt5.QtGui import QIcon, QFont
+from PyQt5.QtGui import QIcon, QFont, QStyle
 import pygame
 
 # 获取资源路径的辅助函数
@@ -56,8 +56,20 @@ class PomodoroTimer(QMainWindow):
         self.total_elapsed = 0
         self.current_interval = 0
         
+        # 总时间倒计时相关
+        self.overall_start_time = 0
+        self.total_target_seconds = 0
+        self.total_time_remaining_label = None # 将在 init_ui 中创建
+        
         self.init_ui()
         self.init_tray()
+    
+    def format_total_seconds(self, total_seconds):
+        """将总秒数格式化为 HH:MM:SS 的字符串"""
+        s = int(total_seconds)
+        m, s_rem = divmod(s, 60)
+        h, m_rem = divmod(m, 60)
+        return f"{h:02d}:{m_rem:02d}:{s_rem:02d}"
     
     def init_ui(self):
         self.setWindowTitle("专注时钟")
@@ -181,6 +193,12 @@ class PomodoroTimer(QMainWindow):
         self.timer_label.setFont(QFont("Arial", 36, QFont.Bold))
         status_layout.addWidget(self.timer_label)
         
+        # 总剩余时间显示
+        self.total_time_remaining_label = QLabel(f"总剩余: {self.format_total_seconds(self.total_time * 60)}")
+        self.total_time_remaining_label.setAlignment(Qt.AlignCenter)
+        self.total_time_remaining_label.setFont(QFont("Arial", 12)) # 稍小字体
+        status_layout.addWidget(self.total_time_remaining_label)
+        
         main_layout.addWidget(status_group)
         
         # 控制按钮
@@ -213,18 +231,25 @@ class PomodoroTimer(QMainWindow):
         try:
             icon_path = resource_path("icons/clock.png")
             if os.path.exists(icon_path):
-                self.tray_icon.setIcon(QIcon(icon_path))
+                icon = QIcon(icon_path)
+                self.tray_icon.setIcon(icon)
+                # 同时设置应用程序图标
+                self.setWindowIcon(icon)
             else:
-                # 如果找不到自定义图标，使用默认应用图标
-                self.tray_icon.setIcon(QIcon(os.path.join(os.path.dirname(sys.executable), "pythonw.exe")))
+                # 尝试使用应用程序默认图标
+                app_icon = QApplication.style().standardIcon(QStyle.SP_ComputerIcon)
+                self.tray_icon.setIcon(app_icon)
+                self.setWindowIcon(app_icon)
+                print(f"警告：找不到自定义图标文件，使用系统默认图标")
         except Exception as e:
             print(f"设置托盘图标失败: {e}")
-            # 尝试使用Windows系统提供的默认图标
+            # 尝试使用系统标准图标
             try:
-                from PyQt5.QtWinExtras import QtWinTheme
-                self.tray_icon.setIcon(QtWinTheme.createIconFromHICON(0))
-            except:
-                pass
+                app_icon = QApplication.style().standardIcon(QStyle.SP_ComputerIcon)
+                self.tray_icon.setIcon(app_icon)
+                self.setWindowIcon(app_icon)
+            except Exception as e:
+                print(f"使用系统标准图标也失败: {e}")
         
         # 创建托盘菜单
         tray_menu = QMenu()
@@ -240,8 +265,9 @@ class PomodoroTimer(QMainWindow):
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.activated.connect(self.tray_icon_activated)
         
-        # 显示托盘图标
+        # 显示托盘图标 - 尝试强制确保显示
         self.tray_icon.show()
+        QApplication.processEvents()  # 处理挂起的事件以确保图标显示
         
         # 设置工具提示
         self.tray_icon.setToolTip("专注时钟")
@@ -257,15 +283,34 @@ class PomodoroTimer(QMainWindow):
             self.show_window()
     
     def closeEvent(self, event):
-        # 直接最小化到托盘，不弹出询问对话框
-        event.ignore()
-        self.hide()
-        self.tray_icon.showMessage(
-            "专注时钟",
-            "应用程序已最小化到系统托盘，继续在后台运行",
-            QSystemTrayIcon.Information,
-            2000
-        )
+        # 询问用户是否真的要退出应用程序
+        reply = QMessageBox.question(self, '退出确认', 
+                                    '确定要退出应用程序吗？\n\n如果您想保持程序在后台运行，请点击"取消"，\n程序将最小化到系统托盘。',
+                                    QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                                    QMessageBox.Cancel)
+        
+        if reply == QMessageBox.Yes:
+            # 用户选择退出
+            self.stop_timer()
+            self.tray_icon.hide()  # 隐藏托盘图标
+            event.accept()  # 允许关闭
+        elif reply == QMessageBox.No:
+            # 用户选择最小化到托盘
+            event.ignore()
+            self.hide()
+            # 确保托盘图标可见
+            if not self.tray_icon.isVisible():
+                self.tray_icon.show()
+            # 显示通知
+            self.tray_icon.showMessage(
+                "专注时钟",
+                "应用程序已最小化到系统托盘，继续在后台运行",
+                QSystemTrayIcon.Information,
+                2000
+            )
+        else:
+            # 用户取消操作
+            event.ignore()
     
     def close_application(self):
         # 完全退出应用
@@ -301,6 +346,11 @@ class PomodoroTimer(QMainWindow):
         self.is_running = True
         self.total_elapsed = 0
         
+        # 设置总时间倒计时
+        self.total_target_seconds = self.total_time * 60
+        self.overall_start_time = time.time()
+        self.total_time_remaining_label.setText(f"总剩余: {self.format_total_seconds(self.total_target_seconds)}")
+        
         # 启动计时器线程
         self.timer_thread = threading.Thread(target=self.timer_loop)
         self.timer_thread.daemon = True
@@ -327,6 +377,14 @@ class PomodoroTimer(QMainWindow):
             # 更新状态
             self.update_signal.emit("已停止")
             self.timer_label.setText("00:00")
+            
+            # 重置总时间显示以反映当前spinbox中的设置
+            current_total_seconds_setting = self.total_time_spinbox.value() * 60
+            self.total_time_remaining_label.setText(f"总剩余: {self.format_total_seconds(current_total_seconds_setting)}")
+            
+            # 重置总计时器内部状态
+            self.overall_start_time = 0
+            self.total_target_seconds = 0
     
     def play_sound(self, sound):
         """播放声音，如果声音文件不可用则使用Windows系统声音"""
@@ -410,6 +468,16 @@ class PomodoroTimer(QMainWindow):
         # 更新计时器显示
         mins, secs = divmod(self.remaining_time, 60)
         self.timer_label.setText(f"{mins:02d}:{secs:02d}")
+        
+        # 更新总剩余时间显示
+        if self.is_running and self.overall_start_time > 0:
+            elapsed_overall_seconds = time.time() - self.overall_start_time
+            remaining_overall_seconds = self.total_target_seconds - elapsed_overall_seconds
+            
+            if remaining_overall_seconds < 0:
+                remaining_overall_seconds = 0
+            
+            self.total_time_remaining_label.setText(f"总剩余: {self.format_total_seconds(remaining_overall_seconds)}")
 
 def main():
     app = QApplication(sys.argv)
