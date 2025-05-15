@@ -14,15 +14,15 @@ for folder in ["sounds", "icons"]:
 
 # 检查声音文件是否存在
 sound_files = [
-    ("sounds/ding.wav", "缺少提示音文件"),
-    ("sounds/break.wav", "缺少休息提示音文件"),
+    ("sounds/ding.mp3", "缺少提示音文件"),
+    ("sounds/break.mp3", "缺少休息提示音文件"),
 ]
 
 for sound_file, error_msg in sound_files:
     if not os.path.exists(sound_file):
         print(f"警告: {error_msg} {sound_file}")
         print("将创建简单的默认声音文件...")
-        # 创建空白的WAV文件，实际项目中应替换为真实的声音文件
+        # 创建空白的MP3文件，实际项目中应替换为真实的声音文件
         with open(sound_file, 'w') as f:
             f.write("PLACEHOLDER_FOR_SOUND_FILE")
 

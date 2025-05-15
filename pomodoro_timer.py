@@ -1,7 +1,6 @@
 import sys
 import random
 import time
-import os
 from datetime import datetime, timedelta
 import threading
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
@@ -10,17 +9,6 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot, QEvent
 from PyQt5.QtGui import QIcon, QFont
 import pygame
-
-# 获取资源路径的辅助函数
-def resource_path(relative_path):
-    """ 获取资源的绝对路径，支持PyInstaller打包后的路径 """
-    try:
-        # PyInstaller创建临时文件夹并将路径存储在_MEIPASS中
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    
-    return os.path.join(base_path, relative_path)
 
 class PomodoroTimer(QMainWindow):
     update_signal = pyqtSignal(str)
@@ -32,14 +20,8 @@ class PomodoroTimer(QMainWindow):
         pygame.mixer.init()
         
         # 加载声音
-        try:
-            self.ding_sound = pygame.mixer.Sound(resource_path("sounds/ding.mp3"))
-            self.break_sound = pygame.mixer.Sound(resource_path("sounds/break.mp3"))
-        except:
-            # 如果声音加载失败，使用系统提示音
-            print("警告：声音文件加载失败，将使用系统提示音")
-            self.ding_sound = None
-            self.break_sound = None
+        self.ding_sound = pygame.mixer.Sound("sounds/ding.mp3")
+        self.break_sound = pygame.mixer.Sound("sounds/break.mp3")
         
         # 设置默认参数
         self.min_interval = 3  # 最小间隔(分钟)
@@ -61,14 +43,6 @@ class PomodoroTimer(QMainWindow):
     def init_ui(self):
         self.setWindowTitle("专注时钟")
         self.setFixedSize(400, 300)
-        
-        # 设置图标
-        try:
-            icon_path = resource_path("icons/clock.png")
-            if os.path.exists(icon_path):
-                self.setWindowIcon(QIcon(icon_path))
-        except:
-            pass
         
         # 主布局
         central_widget = QWidget()
@@ -167,13 +141,7 @@ class PomodoroTimer(QMainWindow):
     def init_tray(self):
         # 创建系统托盘图标
         self.tray_icon = QSystemTrayIcon(self)
-        try:
-            icon_path = resource_path("icons/clock.png")
-            if os.path.exists(icon_path):
-                self.tray_icon.setIcon(QIcon(icon_path))
-        except:
-            # 使用默认图标
-            pass
+        self.tray_icon.setIcon(QIcon('icons/clock.png'))
         
         # 创建托盘菜单
         tray_menu = QMenu()
@@ -266,20 +234,6 @@ class PomodoroTimer(QMainWindow):
             self.update_signal.emit("已停止")
             self.timer_label.setText("00:00")
     
-    def play_sound(self, sound):
-        """播放声音，如果声音文件不可用则使用Windows系统声音"""
-        if sound is not None:
-            try:
-                sound.play()
-            except:
-                # 失败时尝试播放系统提示音
-                import winsound
-                winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
-        else:
-            # 使用Windows系统提示音
-            import winsound
-            winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
-    
     def timer_loop(self):
         while self.is_running and self.total_elapsed < self.total_time * 60:
             # 随机选择当前间隔
@@ -292,7 +246,7 @@ class PomodoroTimer(QMainWindow):
                 break
                 
             # 播放提示音
-            self.play_sound(self.ding_sound)
+            self.ding_sound.play()
             
             # 显示短休息提示
             self.update_signal.emit(f"请休息 {self.short_break} 秒")
@@ -306,7 +260,7 @@ class PomodoroTimer(QMainWindow):
         # 如果是正常结束（不是被用户停止）
         if self.is_running and self.total_elapsed >= self.total_time * 60:
             # 播放长休息提示音
-            self.play_sound(self.break_sound)
+            self.break_sound.play()
             
             # 显示长休息提示
             self.update_signal.emit(f"90分钟已到！请起来活动并休息 {self.long_break} 分钟")

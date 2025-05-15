@@ -19,10 +19,19 @@
 4. 应用程序可以最小化到系统托盘继续在后台运行
 5. 双击托盘图标可以重新打开主界面
 
+## 自定义声音
+
+程序使用两种声音提示：
+- `sounds/ding.mp3` - 短休息提示音
+- `sounds/break.mp3` - 长休息提示音
+
+您可以替换这些文件以自定义提示音。
+
 ## 打包指南
 
 要将此项目打包为exe文件，请按照以下步骤操作：
 
 1. 确保已安装所有依赖：`pip install -r requirements.txt`
-2. 运行打包命令：`pyinstaller --onefile --windowed --icon=icons/clock.ico --name="专注时钟" pomodoro_timer.py`
-3. 打包好的文件将位于 `dist` 目录中 
+2. 运行打包命令：`pyinstaller --onefile --windowed --icon=icons/clock.ico --name="专注时钟" pomodoro_timer_windows.py`
+3. 或者直接运行：`python build.py`
+4. 打包好的文件将位于 `dist` 目录中 
