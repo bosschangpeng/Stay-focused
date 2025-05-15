@@ -5,8 +5,9 @@ from datetime import datetime, timedelta
 import threading
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLabel, QPushButton, QSpinBox, 
-                            QSystemTrayIcon, QMenu, QAction, QMessageBox)
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot, QEvent
+                            QSystemTrayIcon, QMenu, QAction, QMessageBox,
+                            QGridLayout, QSizePolicy, QGroupBox, QFormLayout)
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot, QEvent, QSize
 from PyQt5.QtGui import QIcon, QFont
 import pygame
 
@@ -42,29 +43,38 @@ class PomodoroTimer(QMainWindow):
     
     def init_ui(self):
         self.setWindowTitle("专注时钟")
-        self.setFixedSize(400, 300)
+        self.setMinimumSize(500, 400)  # 设置最小尺寸，允许放大
         
         # 主布局
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
+        main_layout.setSpacing(15)  # 增加布局间距
+        main_layout.setContentsMargins(20, 20, 20, 20)  # 增加边距
         
         # 标题
         title_label = QLabel("专注时钟")
         title_label.setAlignment(Qt.AlignCenter)
-        title_label.setFont(QFont("Arial", 16, QFont.Bold))
+        title_label.setFont(QFont("Arial", 20, QFont.Bold))
         main_layout.addWidget(title_label)
         
-        # 设置区域
-        settings_layout = QVBoxLayout()
+        # 设置组 - 使用分组框和表单布局使界面更清晰
+        settings_group = QGroupBox("时间设置")
+        settings_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        settings_layout = QFormLayout(settings_group)
+        settings_layout.setVerticalSpacing(10)
+        settings_layout.setHorizontalSpacing(15)
         
         # 工作间隔设置
-        interval_layout = QHBoxLayout()
-        interval_layout.addWidget(QLabel("工作间隔:"))
+        interval_widget = QWidget()
+        interval_layout = QHBoxLayout(interval_widget)
+        interval_layout.setContentsMargins(0, 0, 0, 0)
         
         self.min_spinbox = QSpinBox()
         self.min_spinbox.setRange(1, 30)
         self.min_spinbox.setValue(self.min_interval)
+        self.min_spinbox.setSingleStep(1)
+        self.min_spinbox.setMinimumWidth(70)
         interval_layout.addWidget(self.min_spinbox)
         
         interval_layout.addWidget(QLabel("到"))
@@ -72,65 +82,78 @@ class PomodoroTimer(QMainWindow):
         self.max_spinbox = QSpinBox()
         self.max_spinbox.setRange(1, 30)
         self.max_spinbox.setValue(self.max_interval)
+        self.max_spinbox.setSingleStep(1)
+        self.max_spinbox.setMinimumWidth(70)
         interval_layout.addWidget(self.max_spinbox)
         
         interval_layout.addWidget(QLabel("分钟"))
-        settings_layout.addLayout(interval_layout)
+        interval_layout.addStretch(1)
+        settings_layout.addRow("工作间隔:", interval_widget)
         
         # 短休息设置
-        short_break_layout = QHBoxLayout()
-        short_break_layout.addWidget(QLabel("短休息时间:"))
         self.short_break_spinbox = QSpinBox()
         self.short_break_spinbox.setRange(5, 60)
         self.short_break_spinbox.setValue(self.short_break)
-        short_break_layout.addWidget(self.short_break_spinbox)
-        short_break_layout.addWidget(QLabel("秒"))
-        settings_layout.addLayout(short_break_layout)
+        self.short_break_spinbox.setSingleStep(5)
+        self.short_break_spinbox.setMinimumWidth(70)
+        settings_layout.addRow("短休息时间:", self.short_break_spinbox)
+        settings_layout.addWidget(QLabel("秒"), 1, 2)
         
         # 长休息设置
-        long_break_layout = QHBoxLayout()
-        long_break_layout.addWidget(QLabel("长休息时间:"))
         self.long_break_spinbox = QSpinBox()
         self.long_break_spinbox.setRange(5, 60)
         self.long_break_spinbox.setValue(self.long_break)
-        long_break_layout.addWidget(self.long_break_spinbox)
-        long_break_layout.addWidget(QLabel("分钟"))
-        settings_layout.addLayout(long_break_layout)
+        self.long_break_spinbox.setSingleStep(5)
+        self.long_break_spinbox.setMinimumWidth(70)
+        settings_layout.addRow("长休息时间:", self.long_break_spinbox)
+        settings_layout.addWidget(QLabel("分钟"), 2, 2)
         
         # 总时间设置
-        total_time_layout = QHBoxLayout()
-        total_time_layout.addWidget(QLabel("总工作时间:"))
         self.total_time_spinbox = QSpinBox()
         self.total_time_spinbox.setRange(10, 240)
         self.total_time_spinbox.setValue(self.total_time)
-        total_time_layout.addWidget(self.total_time_spinbox)
-        total_time_layout.addWidget(QLabel("分钟"))
-        settings_layout.addLayout(total_time_layout)
+        self.total_time_spinbox.setSingleStep(10)
+        self.total_time_spinbox.setMinimumWidth(70)
+        settings_layout.addRow("总工作时间:", self.total_time_spinbox)
+        settings_layout.addWidget(QLabel("分钟"), 3, 2)
         
-        main_layout.addLayout(settings_layout)
+        main_layout.addWidget(settings_group)
+        
+        # 状态显示区域 - 使用框架突出显示
+        status_group = QGroupBox("状态")
+        status_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        status_layout = QVBoxLayout(status_group)
+        status_layout.setSpacing(10)
         
         # 状态显示
         self.status_label = QLabel("准备就绪")
         self.status_label.setAlignment(Qt.AlignCenter)
-        self.status_label.setFont(QFont("Arial", 12))
-        main_layout.addWidget(self.status_label)
+        self.status_label.setFont(QFont("Arial", 14))
+        status_layout.addWidget(self.status_label)
         
         # 倒计时显示
         self.timer_label = QLabel("00:00")
         self.timer_label.setAlignment(Qt.AlignCenter)
-        self.timer_label.setFont(QFont("Arial", 24, QFont.Bold))
-        main_layout.addWidget(self.timer_label)
+        self.timer_label.setFont(QFont("Arial", 36, QFont.Bold))
+        status_layout.addWidget(self.timer_label)
+        
+        main_layout.addWidget(status_group)
         
         # 控制按钮
         button_layout = QHBoxLayout()
+        button_layout.setSpacing(20)
         
         self.start_button = QPushButton("开始")
         self.start_button.clicked.connect(self.start_timer)
+        self.start_button.setMinimumHeight(40)
+        self.start_button.setFont(QFont("Arial", 12))
         button_layout.addWidget(self.start_button)
         
         self.stop_button = QPushButton("停止")
         self.stop_button.clicked.connect(self.stop_timer)
         self.stop_button.setEnabled(False)
+        self.stop_button.setMinimumHeight(40)
+        self.stop_button.setFont(QFont("Arial", 12))
         button_layout.addWidget(self.stop_button)
         
         main_layout.addLayout(button_layout)
