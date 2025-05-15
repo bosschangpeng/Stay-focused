@@ -92,10 +92,19 @@ class CircularProgressBar(QWidget):
         painter.setFont(font)
         painter.drawText(rect, Qt.AlignCenter, self.text)
         
-        # 绘制总剩余时间文本
-        font = QFont("Arial", 12)
+        # 绘制总剩余时间文本 - 向上移动并增加字体粗细
+        font = QFont("Arial", 13, QFont.Bold)  # 增加字体粗细和略微增加字号
         painter.setFont(font)
-        total_rect = QRectF(rect.left(), rect.bottom() - 30, rect.width(), 30)
+        
+        # 在圆形内部绘制总剩余时间，而不是边缘
+        # 创建一个比原来更高的矩形区域用于文本绘制
+        # 将文本区从底部移上来约20%的圆形高度
+        total_rect = QRectF(
+            rect.left(), 
+            rect.top() + rect.height() * 0.66,  # 从顶部向下移动66%的位置(原来是在底部)
+            rect.width(), 
+            rect.height() * 0.2  # 高度为圆形高度的20%
+        )
         painter.drawText(total_rect, Qt.AlignCenter, self.total_text)
 
 class PomodoroTimer(QMainWindow):
@@ -445,6 +454,10 @@ class PomodoroTimer(QMainWindow):
             # 短休息倒计时
             self.countdown(self.short_break, "短休息")
             
+            # 短休息结束时播放提示音
+            if self.is_running:
+                self.ding_sound.play()
+            
             # 更新总计时
             self.total_elapsed += self.current_interval + self.short_break
             
@@ -466,6 +479,10 @@ class PomodoroTimer(QMainWindow):
             
             # 长休息倒计时
             self.countdown(self.long_break * 60, "长休息")
+            
+            # 长休息结束时播放提示音
+            if self.is_running:
+                self.ding_sound.play()
             
             # 重置计时器
             self.stop_timer()
