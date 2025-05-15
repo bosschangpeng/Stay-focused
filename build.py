@@ -4,6 +4,12 @@ import shutil
 from distutils.core import setup
 import PyInstaller.__main__
 
+# 设置控制台输出编码
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    os.system('chcp 65001 >nul')  # 设置Windows命令行为UTF-8编码
+
 print("开始打包专注时钟应用...")
 
 # 确保必要的文件夹存在
