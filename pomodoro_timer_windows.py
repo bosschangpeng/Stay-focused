@@ -7,9 +7,10 @@ import threading
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLabel, QPushButton, QSpinBox, 
                             QSystemTrayIcon, QMenu, QAction, QMessageBox,
-                            QGridLayout, QSizePolicy, QGroupBox, QFormLayout)
+                            QGridLayout, QSizePolicy, QGroupBox, QFormLayout,
+                            QStyle)
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot, QEvent, QSize
-from PyQt5.QtGui import QIcon, QFont, QStyle
+from PyQt5.QtGui import QIcon, QFont
 import pygame
 
 # 获取资源路径的辅助函数
@@ -79,9 +80,11 @@ class PomodoroTimer(QMainWindow):
         try:
             icon_path = resource_path("icons/clock.png")
             if os.path.exists(icon_path):
-                self.setWindowIcon(QIcon(icon_path))
-        except:
-            pass
+                app_icon = QIcon(icon_path)
+                self.setWindowIcon(app_icon)
+                print(f"成功设置窗口图标: {icon_path}")
+        except Exception as e:
+            print(f"设置窗口图标失败: {e}")
         
         # 主布局
         central_widget = QWidget()
@@ -230,11 +233,15 @@ class PomodoroTimer(QMainWindow):
         # 尝试设置图标
         try:
             icon_path = resource_path("icons/clock.png")
+            print(f"尝试加载托盘图标，路径: {icon_path}")
+            print(f"该路径是否存在: {os.path.exists(icon_path)}")
+            
             if os.path.exists(icon_path):
                 icon = QIcon(icon_path)
                 self.tray_icon.setIcon(icon)
-                # 同时设置应用程序图标
+                # 确保窗口图标也设置
                 self.setWindowIcon(icon)
+                print("成功设置托盘图标")
             else:
                 # 尝试使用应用程序默认图标
                 app_icon = QApplication.style().standardIcon(QStyle.SP_ComputerIcon)
