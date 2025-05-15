@@ -24,11 +24,11 @@ jobs:
         pip install pyinstaller
     
     - name: Build with PyInstaller
-      run: python build.py
+      run: python build_en.py
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ZhuanZhuClock
-        path: dist/专注时钟.exe
+        name: FocusTimer
+        path: dist/FocusTimer.exe
         if-no-files-found: error
